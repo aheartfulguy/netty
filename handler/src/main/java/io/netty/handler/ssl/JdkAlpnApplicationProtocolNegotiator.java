@@ -22,7 +22,8 @@ import javax.net.ssl.SSLEngine;
  * The {@link JdkApplicationProtocolNegotiator} to use if you need ALPN and are using {@link SslProvider#JDK}.
  */
 public final class JdkAlpnApplicationProtocolNegotiator extends JdkBaseApplicationProtocolNegotiator {
-    private static final boolean AVAILABLE = Conscrypt.isAvailable() || JettyAlpnSslEngine.isAvailable();
+    private static final boolean AVAILABLE = Conscrypt.isAvailable() || JettyAlpnSslEngine.isAvailable() ||
+            Java9SslUtils.supportsAlpn();
     private static final SslEngineWrapperFactory ALPN_WRAPPER = AVAILABLE ? new AlpnWrapper() : new FailureWrapper();
 
     /**
@@ -119,6 +120,7 @@ public final class JdkAlpnApplicationProtocolNegotiator extends JdkBaseApplicati
     }
 
     private static final class AlpnWrapper extends AllocatorAwareSslEngineWrapperFactory {
+
         @Override
         public SSLEngine wrapSslEngine(SSLEngine engine, ByteBufAllocator alloc,
                                        JdkApplicationProtocolNegotiator applicationNegotiator, boolean isServer) {
@@ -129,6 +131,9 @@ public final class JdkAlpnApplicationProtocolNegotiator extends JdkBaseApplicati
             if (JettyAlpnSslEngine.isAvailable()) {
                 return isServer ? JettyAlpnSslEngine.newServerEngine(engine, applicationNegotiator)
                         : JettyAlpnSslEngine.newClientEngine(engine, applicationNegotiator);
+            }
+            if (Java9SslUtils.supportsAlpn()) {
+                return new Java9SslEngineWrapper(engine, applicationNegotiator);
             }
             throw new RuntimeException("Unable to wrap SSLEngine of type " + engine.getClass().getName());
         }
